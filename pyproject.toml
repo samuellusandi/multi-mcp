@@ -1,0 +1,10 @@
+[project]
+name = "multi-mcp"
+version = "0.1.0"
+description = "MCP proxy project with multi-client support"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+filterwarnings = ["ignore::pydantic.warnings.PydanticDeprecatedSince211"]
