@@ -34,13 +34,13 @@ async def main():
         agent = create_react_agent(model, tools)
 
         # Run first message — uses weather tool
-        weather_response = await agent.ainvoke({"messages": "what is the weather in London?"})
-        for m in weather_response['messages']:
+        response = await agent.ainvoke({"messages": "what is the weather in London?"})
+        for m in response['messages']:
             m.pretty_print()
 
         # Run second message — uses calculator tool
-        weather_response = await agent.ainvoke({"messages": "what's the answer for (10 + 5)?"})
-        for m in weather_response['messages']:
+        response = await agent.ainvoke({"messages": "what's the answer for (10 + 5)?"})
+        for m in response['messages']:
             m.pretty_print()
 
 

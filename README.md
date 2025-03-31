@@ -2,7 +2,7 @@
 # **Multi MCP**
 
 A flexible and dynamic **Multi-MCP** Proxy Server that acts as a single MCP server while connecting to and routing between
-multiple backend MCP servers over stdio or SSE.
+multiple backend MCP servers over `STDIO` or `SSE`.
 
 <p align="center">
   <img src="assets/multi-mcp-diagram.png" alt="Multi-MCP Server Architecture" width="300"/>
@@ -10,11 +10,12 @@ multiple backend MCP servers over stdio or SSE.
 
 ## 🚀 Features
 
-- ✅ Supports both `stdio` and `sse` transports
-- ✅ Can connect to MCP servers running in either `stdio` or `sse` mode
+- ✅ Supports both `STDIO` and `SSE` transports
+- ✅ Can connect to MCP servers running in either `STDIO` or `SSE` mode
 - ✅ Proxies requests to multiple MCP servers
 - ✅ Automatically initializes capabilities (tools, prompts, resources) from connected servers
 - ✅ Dynamically **add/remove MCP servers** at runtime (via HTTP API)
+- ✅ Supports tools with the same name on different servers (using namespacing)
 - ✅ Deployable on Kubernetes, exposing a single port to access all connected MCP servers through the proxy
 
 ## 📦 Installation
@@ -24,7 +25,7 @@ To get started with this project locally:
 ```bash
 # Clone the repository
 git clone https://github.com/kfirtoledo/multi-mcp.git
-cd mcp-client
+cd multi-mcp
 
 # Install using uv (recommended)
 uv venv
@@ -33,9 +34,9 @@ uv pip install -r requirements.txt
 
 ## 🖥️ Running Locally
 
-You can run the proxy locally in either stdio or sse mode depending on your needs:
+You can run the proxy locally in either `STDIO` or `SSE` mode depending on your needs:
 
-### 1. Stdio Mode
+### 1. STDIO Mode
 For CLI-style operation (pipe-based communication).
 Used for chaining locally executed tools or agents.
 
@@ -51,7 +52,7 @@ Useful for remote access, browser agents, and network-based tools.
 uv run main.py --transport sse
 ```
 
-Note: You can also configure the host and port using --host / --port arguments.
+**Note:** You can also configure the host and port using `--host` / `--port` arguments.
 
 ## ⚙️ Configuration
 
@@ -74,6 +75,8 @@ The proxy is initialized using a JSON config (default: `./mcp.json`):
 
 This config defines the initial list of MCP-compatible servers to spawn and connect at startup.
 
+**Note:** Tool names are namespaced internally as `server_name::tool_name` to avoid conflicts and allow multiple servers to expose tools with the same base name. For example, if an MCP server named `calculator` provides an `add` tool, it will be referenced as `calculator::add`.
+
 You can also connect to a remote MCP server using SSE:
 
 ```json
@@ -86,7 +89,7 @@ You can also connect to a remote MCP server using SSE:
 }
 ```
 
-More examples can be found in the examples/config/ directory.
+More examples can be found in the [examples/config/](./examples/config/) directory.
 
 ## 🔄 Dynamic Server Management (SSE only)
 
@@ -130,7 +133,7 @@ make docker-build
 
 # Run locally with port exposure
 make docker-run
-
+```
 
 ## Kubernetes
 

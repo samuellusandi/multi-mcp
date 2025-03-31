@@ -15,7 +15,7 @@ IMAGE_NAME = "multi-mcp"
 NODE_PORT = 30080
 BASE_DIR = Path(__file__).parent.parent.resolve()  # go up from tests/
 K8S_MANIFESTS_DIR = Path(f"{BASE_DIR}/examples/k8s")
-EXPECTED_TOOLS=["convert_temperature","convert_length", "add", "multiply"]
+EXPECTED_TOOLS=["unit_convertor::convert_temperature","unit_convertor::convert_length", "calculator::add", "calculator::multiply"]
 TEST_PROMPTS=[
         ("Convert temperature of 100 Celsius to Fahrenheit?", "212"),
         ("what's the answer for (10 + 5)?", "15"),
@@ -55,16 +55,13 @@ def setup_kind_cluster():
     print("⏳ Waiting for deployment to be ready...")
     run([
         "kubectl", "rollout", "status",
-        "deployment/multi-mcp",  # 👈 replace with your actual deployment name if different
+        "deployment/multi-mcp",
         "--timeout=60s"
     ])
     time.sleep(20) # TODO- replace with get_tools
 
     kind_ip = get_kind_node_ip()
     return kind_ip
-
-    # 🧹 TEARDOWN: runs after all tests that use this fixture are done
-    # run(["kind", "delete", "cluster", "--name", KIND_CLUSTER_NAME])
 
 @pytest.mark.asyncio
 async def test_sse_mode(setup_kind_cluster):

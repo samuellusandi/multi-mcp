@@ -8,12 +8,17 @@ from mcp.shared.memory import create_connected_server_and_client_session
 from src.multimcp.mcp_proxy import MCPProxyServer
 from src.multimcp.mcp_client import MCPClientManager
 
+ECHO_SERVER_NAME="Echo Server"
+SERVER1_NAME="Server1"
+SERVER2_NAME="Server2"
+
+
 # 🔧 Two different test tools
 @pytest.fixture
 def test_tool_1():
     """First mock tool."""
     return Tool(
-        name="tool-1",
+        name="Tool1",
         description="first test tool",
         inputSchema={"type": "object", "properties": {}},
     )
@@ -22,7 +27,7 @@ def test_tool_1():
 def test_tool_2():
     """Second mock tool."""
     return Tool(
-        name="tool-2",
+        name="Tool2",
         description="second test tool",
         inputSchema={"type": "object", "properties": {}},
     )
@@ -31,7 +36,7 @@ def test_tool_2():
 def test_tool_3():
     """Third mock tool."""
     return Tool(
-        name="tool-3",
+        name="Tool3",
         description="Third test tool",
         inputSchema={"type": "object", "properties": {}},
     )
@@ -48,7 +53,7 @@ def echo_tool():
 @pytest_asyncio.fixture
 async def server_1(test_tool_1):
     """Simulates a server with one tool (tool-1)."""
-    server = Server("Server 1")
+    server = Server(SERVER1_NAME)
     @server.list_tools()
     async def _():
         return [test_tool_1]
@@ -57,7 +62,7 @@ async def server_1(test_tool_1):
 @pytest_asyncio.fixture
 async def server_2(test_tool_2,test_tool_3):
     """Simulates a server with two tools (tool-2, tool-3)."""
-    server = Server("Server 2")
+    server = Server(SERVER2_NAME)
     @server.list_tools()
     async def _():
         return [test_tool_2,test_tool_3]
@@ -68,7 +73,7 @@ async def server_2(test_tool_2,test_tool_3):
 @pytest_asyncio.fixture
 async def echo_server(echo_tool):
     """Simulates a server with an echo tool and its call handler."""
-    server = Server("Echo Server")
+    server = Server(ECHO_SERVER_NAME)
 
     @server.list_tools()
     async def _():
@@ -101,7 +106,7 @@ async def proxy_client_2session(server_1, server_2):
                create_connected_server_and_client_session(server_2) as client_2:
 
         client_manager=MCPClientManager()
-        client_manager.clients={"server-1": client_1,"server-2": client_2}
+        client_manager.clients={server_1.name: client_1,server_2.name: client_2}
         proxy = await MCPProxyServer.create(client_manager)
 
         async with create_connected_server_and_client_session(proxy) as proxy_client:
@@ -131,7 +136,9 @@ async def test_proxy_lists_multiple_tools(server_1, server_2, test_tool_1, test_
         print(f"\n✅ [{test_name}] Tools from proxy: {tool_names}")
 
         assert result.capabilities.tools
-        assert tool_names == {test_tool_1.name, test_tool_2.name,test_tool_3.name}
+        assert tool_names == {MCPProxyServer._make_key(SERVER1_NAME, test_tool_1.name),
+                              MCPProxyServer._make_key(SERVER2_NAME, test_tool_2.name),
+                              MCPProxyServer._make_key(SERVER2_NAME, test_tool_3.name)}
 
 
 @pytest.mark.asyncio
@@ -144,6 +151,8 @@ async def test_proxy_lists_tool(echo_server, echo_tool):
         test_name = inspect.currentframe().f_code.co_name
         print(f"\n✅ [{test_name}] Tools from proxy: {tool_names}")
         assert result.capabilities.tools
+        echo_tool.name=MCPProxyServer._make_key(ECHO_SERVER_NAME,echo_tool.name)
+        assert tool_names == {echo_tool.name}
         assert tools.tools == [echo_tool]
 
 
@@ -157,7 +166,7 @@ async def test_proxy_call_tool(echo_server):
         print("🔎 Proxy Capabilities:", init_result.capabilities)
 
         # ✅ Correct use of `call_tool` with name + arguments
-        result = await proxy.call_tool("echo", {})
+        result = await proxy.call_tool(MCPProxyServer._make_key(ECHO_SERVER_NAME,"echo"), {})
 
         print(f"\n [{inspect.currentframe().f_code.co_name}] call_tool result:")
         for c in result.content:

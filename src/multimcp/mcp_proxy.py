@@ -3,14 +3,21 @@ from mcp import server, types
 from mcp.client.session import ClientSession
 from src.utils.logger import get_logger
 from src.multimcp.mcp_client import MCPClientManager
+from dataclasses import dataclass
+
+@dataclass
+class ToolMapping:
+    server_name: str
+    client: ClientSession
+    tool :types.Tool
 
 class MCPProxyServer(server.Server):
     """An MCP Proxy Server that forwards requests to remote MCP servers."""
 
     def __init__(self, client_manager: MCPClientManager):
-        super().__init__("MCP Proxy Server")
+        super().__init__("MultiMCP proxy Server")
         self.capabilities: dict[str, types.ServerCapabilities] = {}
-        self.tool_to_server: dict[str, ClientSession] = {}
+        self.tool_to_server: dict[str, ToolMapping] = {}      # Support same tool name in diffrent mcp server
         self.prompt_to_server: dict[str, ClientSession] = {}
         self.resource_to_server: dict[str, ClientSession] = {}
         self._register_request_handlers()
@@ -40,9 +47,7 @@ class MCPProxyServer(server.Server):
         self.capabilities[name] = result.capabilities
 
         if result.capabilities.tools:
-            tools_result = await client.list_tools()
-            for tool in tools_result.tools:
-                self.tool_to_server[tool.name] = client
+            await self._initialize_tools_for_client(name,client)
 
         if result.capabilities.prompts:
             prompts_result = await client.list_prompts()
@@ -72,9 +77,9 @@ class MCPProxyServer(server.Server):
 
         self.capabilities.pop(name, None)
 
-        self.tool_to_server = {k: v for k, v in self.tool_to_server.items() if v != client}
-        self.prompt_to_server = {k: v for k, v in self.prompt_to_server.items() if v != client}
-        self.resource_to_server = {k: v for k, v in self.resource_to_server.items() if v != client}
+        self.tool_to_server     = {k: v for k, v in self.tool_to_server.items() if v.client != client}
+        self.prompt_to_server   = {k: v for k, v in self.prompt_to_server.items() if client != client}
+        self.resource_to_server = {k: v for k, v in self.resource_to_server.items() if client != client}
 
         self.logger.info(f"✅ Client '{name}' fully unregistered.")
 
@@ -85,8 +90,8 @@ class MCPProxyServer(server.Server):
         all_tools = []
         for name, client in self.client_manager.clients.items():
             try:
-                tools = await client.list_tools()
-                all_tools.extend(tools.tools)  # .tools, not raw list
+                tools = await self._initialize_tools_for_client(name, client)
+                all_tools.extend(tools)  # .tools, not raw list
             except Exception as e:
                 self.logger.error(f"Error fetching tools from {name}: {e}")
 
@@ -94,12 +99,12 @@ class MCPProxyServer(server.Server):
     async def _call_tool(self, req: types.CallToolRequest) -> types.ServerResult:
         """Invoke a tool on the correct backend MCP server."""
         tool_name = req.params.name
-        client = self.tool_to_server.get(tool_name)
+        tool_item = self.tool_to_server.get(tool_name)
 
-        if client:
+        if tool_item:
             try:
                 self.logger.info(f"✅ Calling tool '{tool_name}' on its associated server")
-                result = await client.call_tool(tool_name, req.params.arguments or {})
+                result = await tool_item.client.call_tool(tool_item.tool.name, req.params.arguments or {})
                 return types.ServerResult(result)
             except Exception as e:
                 self.logger.error(f"❌ Failed to call tool '{tool_name}': {e}")
@@ -275,3 +280,35 @@ class MCPProxyServer(server.Server):
         self.notification_handlers[types.ProgressNotification] = self._send_progress_notification
 
         self.request_handlers[types.SetLevelRequest]           = self._set_logging_level
+
+    async def _initialize_tools_for_client(self, server_name: str, client: ClientSession) -> list[types.Tool]:
+        """Fetch tools from a client, populate tool_to_server, and return them with namespaced keys."""
+        tool_list = []
+
+        tools_result = await client.list_tools()
+        for tool in tools_result.tools:
+            key = self._make_key(server_name, tool.name)
+
+            # Store ToolMapping object
+            self.tool_to_server[key] = ToolMapping(
+                server_name=server_name,
+                client=client,
+                tool=tool
+            )
+
+            # Create a copy of the tool with updated key as name
+            namespaced_tool = tool.model_copy()
+            namespaced_tool.name = key
+            tool_list.append(namespaced_tool)
+
+        return tool_list
+
+    @staticmethod
+    def _make_key(server_name: str, item_name: str) -> str:
+        """Returns a namespaced key like 'server::item' to uniquely identify items per server."""
+        return f"{server_name}::{item_name}"
+
+    @staticmethod
+    def _split_key(key: str) -> tuple[str, str]:
+        """Splits a namespaced key back into (server, item)."""
+        return key.split("::", 1)

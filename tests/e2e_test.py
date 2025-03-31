@@ -3,7 +3,7 @@ import pytest
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from tests.utils import run_e2e_test_with_client
 
-EXPECTED_TOOLS=["get_weather", "add", "multiply"]
+EXPECTED_TOOLS=["weather::get_weather", "calculator::add", "calculator::multiply"]
 TEST_PROMPTS=[
         ("what is the weather in London?", "weather in london"),
         ("what's the answer for (10 + 5)?", "15"),
@@ -29,7 +29,7 @@ async def test_sse_mode():
         stderr=asyncio.subprocess.PIPE,
     )
     try:
-        # ⏳ Wait for the server to be ready (you can improve this with health checks or retry)
+        # ⏳ Wait for the server to be ready (TODO- improve this with health checks or retry)
         await asyncio.sleep(4)
         async with MultiServerMCPClient() as client:
             await client.connect_to_server(
