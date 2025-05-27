@@ -8,7 +8,7 @@ from mcp.server.stdio import stdio_server
 from starlette.applications import Starlette
 from starlette.routing import Route, Mount
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 from mcp.server.sse import SseServerTransport
 
@@ -94,12 +94,17 @@ class MultiMCP:
         sse = SseServerTransport("/messages/")
 
         async def handle_sse(request):
-            async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
-                await self.proxy.run(
-                    streams[0],
-                    streams[1],
-                    self.proxy.create_initialization_options(),
-                )
+            try:
+                async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
+                    await self.proxy.run(
+                        streams[0],
+                        streams[1],
+                        self.proxy.create_initialization_options(),
+                    )
+                return Response("", status_code=200)
+            except Exception as e:
+                self.logger.error(f"SSE connection error: {e}")
+                return Response("SSE connection failed", status_code=500)
 
         starlette_app = Starlette(
             debug=self.settings.sse_server_debug,
@@ -122,6 +127,7 @@ class MultiMCP:
         )
         server = uvicorn.Server(config)
         await server.serve()
+
     async def handle_mcp_servers(self, request: Request) -> JSONResponse:
         """Handle GET/POST/DELETE to list, add, or remove MCP clients at runtime."""
         method = request.method

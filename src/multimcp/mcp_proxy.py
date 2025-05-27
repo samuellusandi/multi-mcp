@@ -305,10 +305,10 @@ class MCPProxyServer(server.Server):
 
     @staticmethod
     def _make_key(server_name: str, item_name: str) -> str:
-        """Returns a namespaced key like 'server::item' to uniquely identify items per server."""
-        return f"{server_name}::{item_name}"
+        """Returns a namespaced key like 'server__item' to uniquely identify items per server."""
+        return f"{server_name}__{item_name}"
 
     @staticmethod
     def _split_key(key: str) -> tuple[str, str]:
         """Splits a namespaced key back into (server, item)."""
-        return key.split("::", 1)
+        return key.split("__", 1)

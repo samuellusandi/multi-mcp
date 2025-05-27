@@ -9,6 +9,7 @@ def parse_args():
     parser.add_argument("--host", type=str, default="127.0.0.1",help="Host to bind the SSE server")
     parser.add_argument("--port", type=int, default=8080,help="Port to bind the SSE server")
     parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],default="INFO", help="Logging level")
+    parser.add_argument("--sse-server-debug", type=str, default="false", help="Enable SSE server debug mode")
 
     return parser.parse_args()
 
@@ -17,5 +18,6 @@ if __name__ == "__main__":
     # Parse CLI arguments and launch the MultiMCP server with the provided settings
     args = parse_args()
 
-    server = MultiMCP(transport=args.transport, config=args.config, host=args.host, port=args.port, log_level=args.log_level)
+    sse_server_debug = args.sse_server_debug and args.sse_server_debug.lower() in ['true', '1', 't', 'y', 'yes', 'yeah', 'yup', 'certainly', 'uh-huh']
+    server = MultiMCP(transport=args.transport, config=args.config, host=args.host, port=args.port, log_level=args.log_level, sse_server_debug=args.sse_server_debug)
     asyncio.run(server.run())

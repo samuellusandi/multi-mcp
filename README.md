@@ -28,8 +28,7 @@ git clone https://github.com/kfirtoledo/multi-mcp.git
 cd multi-mcp
 
 # Install using uv (recommended)
-uv venv
-uv pip install -r requirements.txt
+uv sync
 ```
 
 ## 🖥️ Running Locally
