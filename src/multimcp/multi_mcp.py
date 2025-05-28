@@ -1,3 +1,4 @@
+import base64
 import os
 import uvicorn
 import json
@@ -23,9 +24,11 @@ class MCPSettings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     transport: Literal["stdio", "sse"] = "stdio"
     sse_server_debug: bool = False
-    config: str="./mcp.json"
+    config: str = "./mcp.json"
+    basic_auth: str | None = None
 
 class MultiMCP:
+
     def __init__(self, **settings: Any):
         self.settings = MCPSettings(**settings)
         configure_logging(level=self.settings.log_level)
@@ -45,6 +48,9 @@ class MultiMCP:
         if not clients:
             self.logger.error("❌ No valid clients were created.")
             return
+
+        if not self.settings.basic_auth:
+            self.logger.warning("⚠️ No authentication string provided. Client connections will be unauthenticated.")
 
         self.logger.info(f"✅ Connected clients: {list(clients.keys())}")
 
@@ -91,7 +97,17 @@ class MultiMCP:
 
     async def start_sse_server(self) -> None:
         """Run the proxy server over SSE transport."""
-        sse = SseServerTransport("/messages/")
+        base64_basic_auth = None
+        if self.settings.basic_auth:
+            self.logger.info(f"🔑 Enabling authentication with basic auth string: {self.settings.basic_auth}")
+            base64_basic_auth = base64.b64encode(self.settings.basic_auth.encode("UTF-8")).decode()
+
+        if base64_basic_auth:
+            self.logger.info(f"🔑 Enabling authentication with basic auth string: {self.settings.basic_auth}")
+            self.logger.info(f"🔑 Enabling authentication with base64 auth string: {base64_basic_auth}")
+
+        url_prefix = f"/{base64_basic_auth}" if base64_basic_auth else ''
+        sse = SseServerTransport(f"{url_prefix}/messages/")
 
         async def handle_sse(request):
             try:
@@ -109,13 +125,13 @@ class MultiMCP:
         starlette_app = Starlette(
             debug=self.settings.sse_server_debug,
             routes=[
-                Route("/sse", endpoint=handle_sse),
-                Mount("/messages/", app=sse.handle_post_message),
+                Route(f"{url_prefix}/sse", endpoint=handle_sse),
+                Mount(f"{url_prefix}/messages/", app=sse.handle_post_message),
 
                 # Dynamic endpoints
-                Route("/mcp_servers", endpoint=self.handle_mcp_servers, methods=["GET", "POST"]),
-                Route("/mcp_servers/{name}", endpoint=self.handle_mcp_servers, methods=["DELETE"]),
-                Route("/mcp_tools", endpoint=self.handle_mcp_tools, methods=["GET"])
+                Route(f"{url_prefix}/mcp_servers", endpoint=self.handle_mcp_servers, methods=["GET", "POST"]),
+                Route(f"{url_prefix}/mcp_servers/{{name}}", endpoint=self.handle_mcp_servers, methods=["DELETE"]),
+                Route(f"{url_prefix}/mcp_tools", endpoint=self.handle_mcp_tools, methods=["GET"])
             ],
         )
 

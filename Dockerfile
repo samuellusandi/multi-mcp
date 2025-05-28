@@ -4,8 +4,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN uv venv \
- && uv pip install -r requirements.txt
+RUN uv sync
 
 ENV VIRTUAL_ENV=/app/.venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
@@ -16,4 +15,4 @@ COPY ./examples/config/mcp_k8s.json /app/mcp.json
 
 # Start app
 
-CMD ["python", "main.py", "--transport", "sse", "--config", "mcp.json","--host",""]
+CMD ["python", "main.py", "--transport", "sse", "--config", "mcp.json","--host","", "--sse-server-debug", "true"]
