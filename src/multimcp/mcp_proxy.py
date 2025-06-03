@@ -37,7 +37,7 @@ class MCPProxyServer(server.Server):
             try:
                 await self.initialize_single_client(name, client)
             except Exception as e:
-                self.logger.error(f"❌ Failed to initialize client {name}: {e}")
+                self.logger.error(f"❌ Failed to initialize client {name}: {str(e)}")
 
     async def initialize_single_client(self, name: str, client: ClientSession) -> None:
         """Initialize a specific client and map its capabilities."""
@@ -57,7 +57,7 @@ class MCPProxyServer(server.Server):
         if result.capabilities.resources:
             resources_result = await client.list_resources()
             for resource in resources_result.resources:
-                self.resource_to_server[resource.name] = client
+                self.resource_to_server[resource.uri] = client
 
     async def register_client(self, name: str, client: ClientSession) -> None:
         """Add a new client and register its capabilities."""
@@ -187,7 +187,7 @@ class MCPProxyServer(server.Server):
 
         if client:
             try:
-                result = await client.read_resource(req.params)
+                result = await client.read_resource(req.params.uri)
                 return types.ServerResult(result)
             except Exception as e:
                 self.logger.error(f"❌ Failed to read resource '{resource_uri}': {e}")
