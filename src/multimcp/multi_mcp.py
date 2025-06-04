@@ -201,7 +201,7 @@ class MultiMCP:
             )
 
             handle_functions[name] = \
-                lambda scope, receive, send: session_managers[name].handle_request(scope, receive, send)
+                lambda scope, receive, send, captured_name=name: session_managers[captured_name].handle_request(scope, receive, send)
 
         @asynccontextmanager
         async def lifespan(app: Starlette) -> AsyncIterator[None]:
@@ -209,7 +209,7 @@ class MultiMCP:
             async with AsyncExitStack() as stack:
                 for name, session_manager in session_managers.items():
                     handle_functions[name] = \
-                        lambda scope, receive, send: session_managers[name].handle_request(scope, receive, send)
+                        lambda scope, receive, send, captured_name=name: session_managers[captured_name].handle_request(scope, receive, send)
                     await stack.enter_async_context(session_manager.run())
                 yield
 
