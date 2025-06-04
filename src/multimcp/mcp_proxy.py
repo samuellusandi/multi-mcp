@@ -1,3 +1,4 @@
+from contextlib import AsyncExitStack
 from typing import Any, Optional
 from mcp import server, types
 from mcp.client.session import ClientSession
@@ -96,6 +97,7 @@ class MCPProxyServer(server.Server):
                 self.logger.error(f"Error fetching tools from {name}: {e}")
 
         return types.ServerResult(tools=all_tools)
+
     async def _call_tool(self, req: types.CallToolRequest) -> types.ServerResult:
         """Invoke a tool on the correct backend MCP server."""
         tool_name = req.params.name
