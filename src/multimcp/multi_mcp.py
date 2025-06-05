@@ -139,32 +139,45 @@ class MultiMCP:
             self.logger.info(f"🔑 Enabling authentication with base64 auth string: {base64_basic_auth}")
 
         url_prefix = f"/{base64_basic_auth}" if base64_basic_auth else ''
-        sse = SseServerTransport(f"{url_prefix}/messages/")
 
-        async def handle_sse(request):
-            try:
-                async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
-                    await self.proxy.run(
-                        streams[0],
-                        streams[1],
-                        self.proxy.create_initialization_options(),
-                    )
-                return Response("", status_code=200)
-            except Exception as e:
-                self.logger.error(f"SSE connection error: {e}")
-                return Response("SSE connection failed", status_code=500)
+        sse_transports = {}
+        sse_handlers = {}
+
+        for name, proxy in self.proxies.items():
+            sse_transports[name] = SseServerTransport(f"{url_prefix}/{name}/messages/")
+
+            def create_handle_sse(captured_proxy, captured_sse):
+                async def handle_sse(request):
+                    try:
+                        async with captured_sse.connect_sse(request.scope, request.receive, request._send) as streams:
+                            await captured_proxy.run(
+                                streams[0],
+                                streams[1],
+                                captured_proxy.create_initialization_options(),
+                            )
+                        return Response("", status_code=200)
+                    except Exception as e:
+                        self.logger.error(f"SSE connection error for {name}: {e}")
+                        return Response("SSE connection failed", status_code=500)
+                return handle_sse
+
+            sse_handlers[name] = create_handle_sse(proxy, sse_transports[name])
+
+        routes = []
+        for name in self.proxies.keys():
+            routes.extend([
+                Route(f"{url_prefix}/{name}/sse", endpoint=sse_handlers[name]),
+                Mount(f"{url_prefix}/{name}/messages/", app=sse_transports[name].handle_post_message),
+            ])
+
+        routes.extend([
+            Route(f"{url_prefix}/mcp_servers", endpoint=self.handle_mcp_servers, methods=["GET"]),
+            Route(f"{url_prefix}/mcp_tools", endpoint=self.handle_mcp_tools, methods=["GET"])
+        ])
 
         starlette_app = Starlette(
             debug=self.settings.sse_server_debug,
-            routes=[
-                Route(f"{url_prefix}/sse", endpoint=handle_sse),
-                Mount(f"{url_prefix}/messages/", app=sse.handle_post_message),
-
-                # Dynamic endpoints
-                Route(f"{url_prefix}/mcp_servers", endpoint=self.handle_mcp_servers, methods=["GET", "POST"]),
-                Route(f"{url_prefix}/mcp_servers/{{name}}", endpoint=self.handle_mcp_servers, methods=["DELETE"]),
-                Route(f"{url_prefix}/mcp_tools", endpoint=self.handle_mcp_tools, methods=["GET"])
-            ],
+            routes=routes,
         )
 
         config = uvicorn.Config(
@@ -222,9 +235,7 @@ class MultiMCP:
             routes=[
                 *mounting_routes,
 
-                # Dynamic endpoints
-                Route(f"{url_prefix}/mcp_servers", endpoint=self.handle_mcp_servers, methods=["GET", "POST"]),
-                Route(f"{url_prefix}/mcp_servers/{{name}}", endpoint=self.handle_mcp_servers, methods=["DELETE"]),
+                Route(f"{url_prefix}/mcp_servers", endpoint=self.handle_mcp_servers, methods=["GET"]),
                 Route(f"{url_prefix}/mcp_tools", endpoint=self.handle_mcp_tools, methods=["GET"]),
             ],
             lifespan=lifespan,
@@ -241,13 +252,8 @@ class MultiMCP:
 
     async def handle_mcp_servers(self, request: Request) -> JSONResponse:
         """Handle GET requests to list MCP clients at runtime."""
-        method = request.method
-
-        if method == "GET":
-            servers = list(self.client_managers.keys())
-            return JSONResponse({"active_servers": servers})
-
-        return JSONResponse({"error": f"Unsupported method: {method}"}, status_code=405)
+        servers = list(self.client_managers.keys())
+        return JSONResponse({"active_servers": servers})
 
     async def handle_mcp_tools(self, request: Request) -> JSONResponse:
         """Return the list of currently available tools grouped by server."""
