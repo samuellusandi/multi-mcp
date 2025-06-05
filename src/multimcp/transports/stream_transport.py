@@ -42,10 +42,11 @@ class StreamTransport(BaseTransport):
                 stateless=True,
             )
 
-            # Create proper closure for each handler
-            handle_functions[name] = self._create_handler_function(name, session_managers)
+            handle_functions[name] = \
+                lambda scope, receive, send, captured_name=name: (session_managers[captured_name]
+                                                                  .handle_request(scope, receive, send))
 
-        lifespan = self._create_lifespan(session_managers, handle_functions)
+        lifespan = self._create_lifespan(session_managers)
         routes = self._build_routes(url_prefix, handle_functions)
 
         # Add common routes if route handlers are available
@@ -71,13 +72,15 @@ class StreamTransport(BaseTransport):
         """Create a handler function with proper closure."""
         return lambda scope, receive, send: session_managers[name].handle_request(scope, receive, send)
 
-    @asynccontextmanager
-    async def _create_lifespan(self, session_managers: dict, handle_functions: dict) -> AsyncIterator[None]:
+    def _create_lifespan(self, session_managers: dict):
         """Create lifespan context manager for session managers."""
-        async with AsyncExitStack() as stack:
-            for _name, session_manager in session_managers.items():
-                await stack.enter_async_context(session_manager.run())
-            yield
+        @asynccontextmanager
+        async def lifespan(app):
+            async with AsyncExitStack() as stack:
+                for name, session_manager in session_managers.items():
+                    await stack.enter_async_context(session_manager.run())
+                yield
+        return lifespan
 
     def _build_routes(self, url_prefix: str, handle_functions: dict) -> list:
         """Build all routes for the stream server."""
