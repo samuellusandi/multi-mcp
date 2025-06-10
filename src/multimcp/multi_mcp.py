@@ -18,32 +18,29 @@ from src.multimcp.mcp_client import MCPClientManager
 from src.multimcp.mcp_proxy import MCPProxyServer
 from src.utils.logger import configure_logging, get_logger
 
-class PortHeaderMiddleware:
+class PortHeaderMiddleware(BaseHTTPMiddleware):
     """Middleware to add a header to the request to indicate the port the request was forwarded from."""
 
     def __init__(self, app, port: int):
         """Initialize the middleware with the port number."""
-        self.app = app
+        super().__init__(app)
         self.port = str(port)
 
-    async def __call__(self, scope, receive, send):
-        """ASGI middleware implementation."""
-        if scope["type"] == "http":
-            print(f"🔍 Middleware running for {scope.get('path', 'unknown')}")
-
-            # Add the header to the request
-            headers = list(scope.get("headers", []))
-            headers.append([b"X-Forwarded-From", self.port.encode()])
-
-            # Create new scope with the additional header
-            new_scope = scope.copy()
-            new_scope["headers"] = headers
-
-            print(f"✅ Added header X-Forwarded-From: {self.port} to incoming request")
-
-            await self.app(new_scope, receive, send)
-        else:
-            await self.app(scope, receive, send)
+    async def dispatch(self, request: Request, call_next):
+        """Dispatch the request to the next middleware or endpoint."""
+        print(f"🔍 Middleware running for {request.url.path}")
+        
+        # Add the header to the request by modifying the scope
+        headers = list(request.scope.get("headers", []))
+        headers.append([b"x-forwarded-from", self.port.encode()])
+        request.scope["headers"] = headers
+        
+        print(f"✅ Added header x-forwarded-from: {self.port} to incoming request")
+        
+        # Call the next middleware/endpoint with the modified request
+        response = await call_next(request)
+        
+        return response
 
 class MCPSettings(BaseSettings):
     """Configuration settings for the MultiMCP server."""
@@ -164,7 +161,7 @@ class MultiMCP:
             ],
         )
 
-        starlette_app = PortHeaderMiddleware(starlette_app, port=self.settings.port)
+        starlette_app.add_middleware(PortHeaderMiddleware, port=self.settings.port)
         config = uvicorn.Config(
             starlette_app,
             host=self.settings.host,
