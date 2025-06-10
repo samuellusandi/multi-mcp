@@ -10,12 +10,46 @@ from starlette.applications import Starlette
 from starlette.routing import Route, Mount
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from mcp.server.sse import SseServerTransport
 
 from src.multimcp.mcp_client import MCPClientManager
 from src.multimcp.mcp_proxy import MCPProxyServer
 from src.utils.logger import configure_logging, get_logger
+
+class PortHeaderMiddleware(BaseHTTPMiddleware):
+    """Middleware to add a header to the response to indicate the port the request was forwarded from."""
+
+    def __init__(self, app, port: int):
+        """Initialize the middleware with the port number."""
+        super().__init__(app)
+        self.port = str(port)
+
+    async def dispatch(self, request: Request, call_next):
+        """Dispatch the request to the next middleware or endpoint."""
+        print(f"🔍 Middleware running for {request.url.path}")
+
+        original_send = request._send
+
+        async def custom_send(message):
+            """Custom send function to add the header to the response."""
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                headers.append([b"x-forwarded-from", self.port.encode()])
+                message["headers"] = headers
+                print(f"✅ Added header x-forwarded-from: {self.port} to ASGI response")
+            await original_send(message)
+
+        request._send = custom_send
+
+        response = await call_next(request)
+
+        if hasattr(response, 'headers'):
+            response.headers["X-Forwarded-From"] = self.port
+            print(f"✅ Added header X-Forwarded-From: {self.port} to Response object")
+            
+        return response
 
 class MCPSettings(BaseSettings):
     """Configuration settings for the MultiMCP server."""
@@ -26,6 +60,7 @@ class MCPSettings(BaseSettings):
     sse_server_debug: bool = False
     config: str = "./mcp.json"
     basic_auth: str | None = None
+
 
 class MultiMCP:
 
@@ -131,10 +166,11 @@ class MultiMCP:
                 # Dynamic endpoints
                 Route(f"{url_prefix}/mcp_servers", endpoint=self.handle_mcp_servers, methods=["GET", "POST"]),
                 Route(f"{url_prefix}/mcp_servers/{{name}}", endpoint=self.handle_mcp_servers, methods=["DELETE"]),
-                Route(f"{url_prefix}/mcp_tools", endpoint=self.handle_mcp_tools, methods=["GET"])
+                Route(f"{url_prefix}/mcp_tools", endpoint=self.handle_mcp_tools, methods=["GET"]),
             ],
         )
 
+        starlette_app.add_middleware(PortHeaderMiddleware, port=self.settings.port)
         config = uvicorn.Config(
             starlette_app,
             host=self.settings.host,
