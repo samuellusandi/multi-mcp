@@ -19,7 +19,7 @@ from src.multimcp.mcp_proxy import MCPProxyServer
 from src.utils.logger import configure_logging, get_logger
 
 class PortHeaderMiddleware(BaseHTTPMiddleware):
-    """Middleware to add a header to the request to indicate the port the request was forwarded from."""
+    """Middleware to add a header to the response to indicate the port the request was forwarded from."""
 
     def __init__(self, app, port: int):
         """Initialize the middleware with the port number."""
@@ -29,17 +29,26 @@ class PortHeaderMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         """Dispatch the request to the next middleware or endpoint."""
         print(f"🔍 Middleware running for {request.url.path}")
-        
-        # Add the header to the request by modifying the scope
-        headers = list(request.scope.get("headers", []))
-        headers.append([b"x-forwarded-from", self.port.encode()])
-        request.scope["headers"] = headers
-        
-        print(f"✅ Added header x-forwarded-from: {self.port} to incoming request")
-        
-        # Call the next middleware/endpoint with the modified request
+
+        original_send = request._send
+
+        async def custom_send(message):
+            """Custom send function to add the header to the response."""
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                headers.append([b"x-forwarded-from", self.port.encode()])
+                message["headers"] = headers
+                print(f"✅ Added header x-forwarded-from: {self.port} to ASGI response")
+            await original_send(message)
+
+        request._send = custom_send
+
         response = await call_next(request)
-        
+
+        if hasattr(response, 'headers'):
+            response.headers["X-Forwarded-From"] = self.port
+            print(f"✅ Added header X-Forwarded-From: {self.port} to Response object")
+            
         return response
 
 class MCPSettings(BaseSettings):
