@@ -1,12 +1,14 @@
-import pytest
-import pytest_asyncio
 import inspect
 from contextlib import asynccontextmanager
-from mcp.types import Tool, CallToolResult, TextContent
+
+import pytest
+import pytest_asyncio
 from mcp.server import Server
 from mcp.shared.memory import create_connected_server_and_client_session
-from src.multimcp.mcp_proxy import MCPProxyServer
+from mcp.types import CallToolResult, TextContent, Tool
+
 from src.multimcp.mcp_client import MCPClientManager
+from src.multimcp.mcp_proxy import MCPProxyServer
 
 ECHO_SERVER_NAME="Echo Server"
 SERVER1_NAME="Server1"
@@ -171,7 +173,7 @@ async def test_proxy_call_tool(echo_server):
         print(f"\n [{inspect.currentframe().f_code.co_name}] call_tool result:")
         for c in result.content:
             print(f"  - {c.text}")
-        print(f"\ndone")
+        print("\ndone")
 
         # ✅ Validate output
         assert not result.isError

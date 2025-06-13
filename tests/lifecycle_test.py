@@ -1,8 +1,10 @@
 import asyncio
-import pytest
-import httpx
 import json
+
+import httpx
+import pytest
 from langchain_mcp_adapters.client import MultiServerMCPClient
+
 from tests.utils import run_e2e_test_with_client
 
 MCP_SERVER_URL = "http://127.0.0.1:8080"

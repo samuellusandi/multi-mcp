@@ -1,9 +1,9 @@
 # weather_server.py
-from typing import List
-from mcp.server.fastmcp import FastMCP
-from dotenv import load_dotenv
 import os
+
 import requests
+from dotenv import load_dotenv
+from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("Weather",host="localhost", port=9080)
 load_dotenv()

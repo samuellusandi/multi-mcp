@@ -1,6 +1,8 @@
 import asyncio
+
 import pytest
 from langchain_mcp_adapters.client import MultiServerMCPClient
+
 from tests.utils import run_e2e_test_with_client
 
 EXPECTED_TOOLS=["weather::get_weather", "calculator::add", "calculator::multiply"]

@@ -9,9 +9,22 @@ dependencies = [
     "langgraph>=0.4.7",
     "pytest-asyncio>=1.0.0",
     "rich>=14.0.0",
+    "ruff>=0.11.12",
 ]
 
-[scrip]
+[tool.ruff]
+line-length = 120
+exclude = [".venv", "examples", "tests", "llama-stack.py"]
+
+[tool.ruff.lint]
+ignore = ["C901", "E266"]
+select = ["B", "B9", "C", "D", "E", "F", "I", "PL", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "PLR"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

@@ -1,13 +1,12 @@
-import pytest
+import os
 import subprocess
 import time
-import os
+from pathlib import Path
+
 import pytest
-import asyncio
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from pathlib import Path
+
 from tests.utils import run_e2e_test_with_client
-from pathlib import Path
 
 # 🔍 Resolve absolute path to deployment.yaml
 KIND_CLUSTER_NAME = "multi-mcp-test"
