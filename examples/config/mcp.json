@@ -1,17 +1,8 @@
 {
-"mcpServers": {
-    "weather":  {
-      "command": "python",
-      "args": [
-    "./tests/tools/get_weather.py"
-      ]
-    },
-    "calculator": {
-      "command": "python",
-      "args": [
-     "./tests/tools/calculator.py"
-      ]
-    }
+  "mcpServers": {
+      "time": {
+          "command": "podman",
+          "args": ["--remote", "run", "-i", "--rm", "docker.io/mcp/time"]
+      }
   }
 }
-
